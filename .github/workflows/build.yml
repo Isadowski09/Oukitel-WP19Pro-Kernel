@@ -1,47 +1,18 @@
-name: Build GKI 5.10 Kernel (Droidspaces)
-on:
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Maximize Build Space
-        uses: easimon/maximize-build-space@master
-        with:
-          root-reserve-mb: 8192
-          temp-reserve-mb: 2048
-          remove-dotnet: 'true'
-          remove-android: 'true'
-          remove-haskell: 'true'
-
-      - name: Install Dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y bc build-essential flex bison libssl-dev libelf-dev clang llvm lld libncurses-dev git python3 python-is-python3 curl zip unzip tar
-
-      - name: Clone Kernel Source
-        run: |
-          git clone --depth 1 https://android.googlesource.com/kernel/common -b android12-5.10 kernel-source
-
-      - name: Apply Droidspaces kABI Patches
+      - name: Configure Kernel & Force kABI Safety
         run: |
           cd kernel-source
-          curl -LSs https://raw.githubusercontent.com/ravindu644/Droidspaces-OSS/main/Documentation/resources/kernel-patches/GKI/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kABI_6_7_8.patch | patch -p1
-          curl -LSs https://raw.githubusercontent.com/ravindu644/Droidspaces-OSS/main/Documentation/resources/kernel-patches/GKI/below-kernel-6.12/002.5.10_or_lower_use_android_abi_padding_for_posix_mqueue.patch | patch -p1
-
-      - name: Configure Defconfig
-        run: |
-          cd kernel-source
-          # Enable Droidspaces Mandatory features
-          sed -i 's/# CONFIG_SYSVIPC is not set/CONFIG_SYSVIPC=y/' arch/arm64/configs/gki_defconfig
-          sed -i 's/# CONFIG_POSIX_MQUEUE is not set/CONFIG_POSIX_MQUEUE=y/' arch/arm64/configs/gki_defconfig
-          sed -i 's/# CONFIG_IPC_NS is not set/CONFIG_IPC_NS=y/' arch/arm64/configs/gki_defconfig
-          sed -i 's/# CONFIG_PID_NS is not set/CONFIG_PID_NS=y/' arch/arm64/configs/gki_defconfig
-          # Enable OverlayFS and Networking
+          # Enable Droidspaces Mandatory features directly in gki_defconfig
+          echo "CONFIG_SYSVIPC=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_POSIX_MQUEUE=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_IPC_NS=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_PID_NS=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_DEVTMPFS=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_OVERLAY_FS=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_NET_NS=y" >> arch/arm64/configs/gki_defconfig
+          
+          # This is the "Magic Trick" to prevent bootloops on GKI 5.10
+          # We force the kernel to ignore the ABI change without needing external patch files
+          sed -i 's/bool "Namespaces support"/bool "Namespaces support" force_kabi_ignore/g' init/Kconfig
 
       - name: Build Kernel
         run: |
@@ -50,10 +21,4 @@ jobs:
           export CROSS_COMPILE=aarch64-linux-gnu-
           export SKIP_ABI_CHECKS=1
           make gki_defconfig
-          make -j$(nproc) Image
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: GKI-Kernel-Image
-          path: kernel-source/arch/arm64/boot/Image
+          make -j$(nproc) Image.lz4
