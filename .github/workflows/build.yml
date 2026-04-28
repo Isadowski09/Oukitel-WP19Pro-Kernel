@@ -1,3 +1,25 @@
+name: Build Oukitel Kernel
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc build-essential flex bison libssl-dev libelf-dev clang lld llvm crossbuild-essential-arm64
+
+      - name: Clone Kernel Source
+        run: |
+          # Replace the link below with your actual kernel source if different
+          git clone --depth=1 https://github.com/Isadowski09/android_device_oukitel_WP19_Pro kernel-source || true
+          # If it's already there, this will just continue
+
       - name: Configure Kernel & Force kABI Safety
         run: |
           cd kernel-source
@@ -13,8 +35,7 @@
           echo "CONFIG_OVERLAY_FS=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_NET_NS=y" >> arch/arm64/configs/gki_defconfig
           
-          # This is the "Magic Trick" to prevent bootloops on GKI 5.10
-          # We force the kernel to ignore the ABI change without needing external patch files
+          # Force the kernel to ignore the ABI change
           sed -i 's/bool "Namespaces support"/bool "Namespaces support" force_kabi_ignore/g' init/Kconfig
 
       - name: Build Kernel
@@ -25,4 +46,9 @@
           export SKIP_ABI_CHECKS=1
           make gki_defconfig
           make -j$(nproc) Image.lz4
-          
+
+      - name: Upload Kernel
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-build
+          path: kernel-source/arch/arm64/boot/Image.lz4
