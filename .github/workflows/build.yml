@@ -1,4 +1,4 @@
-name: Build Oukitel Kernel
+name: Build Oukitel Kernel + KSU Next
 on:
   workflow_dispatch:
 
@@ -16,13 +16,19 @@ jobs:
 
       - name: Clone Kernel Source
         run: |
-          # Matches your kernel hash 0d9b8f860603 exactly
+          # Cloning the exact GKI branch for your kernel version
           git clone --depth=1 -b android12-5.10-2024-11_r2 https://android.googlesource.com/kernel/common kernel-source
+
+      - name: Integrate KernelSU Next
+        run: |
+          cd kernel-source
+          # Official KernelSU Next one-line installer to prevent manual errors
+          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/main/kernel/setup.sh" | bash -s main
 
       - name: Configure Kernel for DroidSpace
         run: |
           cd kernel-source
-          # Enable mandatory features for containers
+          # Enable mandatory features for containers/DroidSpace
           echo "CONFIG_NAMESPACES=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_SYSVIPC=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_POSIX_MQUEUE=y" >> arch/arm64/configs/gki_defconfig
@@ -33,19 +39,22 @@ jobs:
           echo "CONFIG_CGROUP_DEVICE=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_OVERLAY_FS=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_NET_NS=y" >> arch/arm64/configs/gki_defconfig
+          
+          # Explicitly enable KernelSU Next configs
+          echo "CONFIG_KSU=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_NEXT=y" >> arch/arm64/configs/gki_defconfig
 
       - name: Build Kernel
         run: |
           cd kernel-source
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
-          # This variable handles the ABI safety instead of modifying Kconfig
           export SKIP_ABI_CHECKS=1
           make gki_defconfig
           make -j$(nproc) Image.lz4
 
-      - name: Upload Kernel
+      - name: Upload Rooted Kernel
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-build
+          name: rooted-kernel-build
           path: kernel-source/arch/arm64/boot/Image.lz4
