@@ -16,14 +16,13 @@ jobs:
 
       - name: Clone Kernel Source
         run: |
-          # Replace the link below with your actual kernel source if different
-          git clone --depth=1 https://github.com/Isadowski09/android_device_oukitel_WP19_Pro kernel-source || true
-          # If it's already there, this will just continue
+          # Cloning the official Android Common Kernel (GKI 5.10)
+          git clone --depth=1 -b android12-5.10 https://android.googlesource.com/kernel/common kernel-source
 
       - name: Configure Kernel & Force kABI Safety
         run: |
           cd kernel-source
-          # Enable Droidspaces Mandatory features directly in gki_defconfig
+          # Enable Droidspaces Mandatory features
           echo "CONFIG_NAMESPACES=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_SYSVIPC=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_POSIX_MQUEUE=y" >> arch/arm64/configs/gki_defconfig
@@ -35,7 +34,7 @@ jobs:
           echo "CONFIG_OVERLAY_FS=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_NET_NS=y" >> arch/arm64/configs/gki_defconfig
           
-          # Force the kernel to ignore the ABI change
+          # Force kABI ignore to prevent bootloops
           sed -i 's/bool "Namespaces support"/bool "Namespaces support" force_kabi_ignore/g' init/Kconfig
 
       - name: Build Kernel
