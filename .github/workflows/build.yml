@@ -22,11 +22,11 @@ jobs:
         run: |
           cd kernel-source
           git clone https://github.com/rifsxd/KernelSU-Next KernelSU-Next
+          
+          # FIXED PATH: Pointing directly to the correct file location
+          sed -i 's/ksu_flush_icache(start, end);/(void)start; (void)end;/g' KernelSU-Next/arch/arm64/patch_memory.c
+          
           ln -sf $(pwd)/KernelSU-Next/kernel drivers/kernelsu
-          
-          # Fix the "statement with no effect" error in patch_memory.c
-          sed -i 's/ksu_flush_icache(start, end);/(void)start; (void)end;/g' KernelSU-Next/kernel/arch/arm64/patch_memory.c
-          
           echo "obj-y += kernelsu/" >> drivers/Makefile
           sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
 
