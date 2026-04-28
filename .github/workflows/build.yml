@@ -1,4 +1,4 @@
-name: Build Oukitel Kernel + KSU Next
+name: Oukitel DroidSpace + KSU Next Patch
 on:
   workflow_dispatch:
 
@@ -9,28 +9,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Toolchain
+      - name: Set up Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc build-essential flex bison libssl-dev libelf-dev clang lld llvm crossbuild-essential-arm64
+          sudo apt-get install -y bc build-essential flex bison libssl-dev libelf-dev clang lld llvm crossbuild-essential-arm64 wget
+
+      - name: Download Stock Boot from Drive
+        run: |
+          # Converts the sharing link to a direct download link
+          wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1ftWiBPzNWa_5t_4wJ4H1Ym1yY1P3vVJl' -O boot.img
 
       - name: Clone Kernel Source
         run: |
           git clone --depth=1 -b android12-5.10-2024-11_r2 https://android.googlesource.com/kernel/common kernel-source
 
-      - name: Integrate KernelSU Next (Final Fix)
+      - name: Integrate KernelSU Next
         run: |
           cd kernel-source
           git clone https://github.com/rifsxd/KernelSU-Next ksunext
-          
-          # Find and delete the problematic cache flush line to bypass the compiler error
+          # Fix compiler error in patch_memory.c
           find ksunext -name "patch_memory.c" -exec sed -i '/ksu_flush_icache/d' {} +
-          
           ln -sf $(pwd)/ksunext/kernel drivers/kernelsu
           echo "obj-y += kernelsu/" >> drivers/Makefile
           sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
 
-      - name: Force GZIP + KSU Config
+      - name: Inject DroidSpace & KSU Configs
         run: |
           cd kernel-source/arch/arm64/configs/
           sed -i 's/CONFIG_KERNEL_LZ4=y/# CONFIG_KERNEL_LZ4 is not set/g' gki_defconfig
@@ -38,12 +41,17 @@ jobs:
           {
             echo "CONFIG_KSU=y"
             echo "CONFIG_KSU_NEXT=y"
+            echo "CONFIG_PID_NS=y"
+            echo "CONFIG_IPC_NS=y"
+            echo "CONFIG_DEVTMPFS=y"
+            echo "CONFIG_DEVTMPFS_MOUNT=y"
+            echo "CONFIG_CGROUP_DEVICE=y"
             echo "CONFIG_NAMESPACES=y"
             echo "CONFIG_OVERLAY_FS=y"
-            echo "CONFIG_CGROUP_DEVICE=y"
+            echo "CONFIG_KPROBES=y"
           } >> gki_defconfig
 
-      - name: Build Kernel (GZIP Output)
+      - name: Build Kernel
         run: |
           cd kernel-source
           export ARCH=arm64
@@ -52,8 +60,16 @@ jobs:
           make gki_defconfig
           make -j$(nproc) Image.gz
 
-      - name: Upload Rooted GZIP Kernel
+      - name: Repack Image
+        run: |
+          wget https://github.com/tiann/KernelSU/raw/main/scripts/magiskboot
+          chmod +x magiskboot
+          ./magiskboot unpack boot.img
+          cp kernel-source/arch/arm64/boot/Image.gz kernel
+          ./magiskboot repack boot.img droidspace_ksu_boot.img
+
+      - name: Upload Patched Boot
         uses: actions/upload-artifact@v4
         with:
-          name: rooted-kernel-build
-          path: kernel-source/arch/arm64/boot/Image.gz
+          name: DroidSpace-Ready-Boot
+          path: droidspace_ksu_boot.img
