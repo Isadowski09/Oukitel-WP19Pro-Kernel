@@ -1,3 +1,9 @@
+- name: Force GZIP Compression
+  run: |
+    sed -i 's/CONFIG_KERNEL_LZ4=y/CONFIG_KERNEL_GZIP=y/g' arch/arm64/configs/gki_defconfig
+    echo "CONFIG_KERNEL_GZIP=y" >> arch/arm64/configs/gki_defconfig
+    echo "# CONFIG_KERNEL_LZ4 is not set" >> arch/arm64/configs/gki_defconfig
+
 name: Build Oukitel Kernel + KSU Next
 on:
   workflow_dispatch:
