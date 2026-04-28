@@ -18,15 +18,18 @@ jobs:
         run: |
           git clone --depth=1 -b android12-5.10-2024-11_r2 https://android.googlesource.com/kernel/common kernel-source
 
-      - name: Integrate KernelSU Next (v3.2.0)
+      - name: Integrate KernelSU Next (Universal Pathing)
         run: |
           cd kernel-source
           git clone https://github.com/rifsxd/KernelSU-Next ksunext
           
-          # Force memory patch for Android 12 compatibility
-          sed -i 's/ksu_flush_icache(start, end);/(void)start; (void)end;/g' ksunext/kernel/patch_memory.c
+          # This finds the patch file wherever it is in the new repo structure
+          PATCH_FILE=$(find ksunext -name "patch_memory.c")
+          if [ -f "$PATCH_FILE" ]; then
+            sed -i 's/ksu_flush_icache(start, end);/(void)start; (void)end;/g' "$PATCH_FILE"
+            echo "Successfully patched: $PATCH_FILE"
+          fi
           
-          # Link drivers into the main build tree
           ln -sf $(pwd)/ksunext/kernel drivers/kernelsu
           echo "obj-y += kernelsu/" >> drivers/Makefile
           sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
@@ -34,11 +37,8 @@ jobs:
       - name: Force GZIP + KSU Config
         run: |
           cd kernel-source/arch/arm64/configs/
-          # Remove LZ4 and force GZIP
           sed -i 's/CONFIG_KERNEL_LZ4=y/# CONFIG_KERNEL_LZ4 is not set/g' gki_defconfig
           echo "CONFIG_KERNEL_GZIP=y" >> gki_defconfig
-          
-          # Add KSU Next and DroidSpace Requirements
           {
             echo "CONFIG_KSU=y"
             echo "CONFIG_KSU_NEXT=y"
