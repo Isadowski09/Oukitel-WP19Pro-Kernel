@@ -21,14 +21,15 @@ jobs:
       - name: Integrate KernelSU Next
         run: |
           cd kernel-source
-          # 1. Clone the Next source
-          git clone https://github.com/rifsxd/KernelSU-Next ksnext
+          # Clone into a fixed, lowercase folder name
+          git clone https://github.com/rifsxd/KernelSU-Next ksunext
           
-          # 2. Fix the error in patch_memory.c using the exact folder path
-          sed -i 's/ksu_flush_icache(start, end);/(void)start; (void)end;/g' ksnext/kernel/arch/arm64/patch_memory.c
+          # Use 'find' to locate the file so path errors are impossible
+          FILEPATH=$(find ksunext -name "patch_memory.c")
+          sed -i 's/ksu_flush_icache(start, end);/(void)start; (void)end;/g' "$FILEPATH"
           
-          # 3. Link it to the drivers folder
-          ln -sf $(pwd)/ksnext/kernel drivers/kernelsu
+          # Link to drivers
+          ln -sf $(pwd)/ksunext/kernel drivers/kernelsu
           echo "obj-y += kernelsu/" >> drivers/Makefile
           sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
 
