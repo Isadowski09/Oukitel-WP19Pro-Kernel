@@ -18,27 +18,24 @@ jobs:
         run: |
           git clone --depth=1 -b android12-5.10-2024-11_r2 https://android.googlesource.com/kernel/common kernel-source
 
-      - name: Integrate KernelSU Next (Manual Method)
+      - name: Integrate KernelSU Next
         run: |
           cd kernel-source
-          # Directly cloning the Next source to prevent 404 errors
           git clone https://github.com/rifsxd/KernelSU-Next KernelSU-Next
           ln -sf $(pwd)/KernelSU-Next/kernel drivers/kernelsu
           
-          # Patching the driver Makefile
+          # Fix the "statement with no effect" error in patch_memory.c
+          sed -i 's/ksu_flush_icache(start, end);/(void)start; (void)end;/g' KernelSU-Next/kernel/arch/arm64/patch_memory.c
+          
           echo "obj-y += kernelsu/" >> drivers/Makefile
-          # Patching the Kconfig
           sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
 
       - name: Configure Kernel for DroidSpace & KSU
         run: |
           cd kernel-source
-          # DroidSpace requirements
           echo "CONFIG_NAMESPACES=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_OVERLAY_FS=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_CGROUP_DEVICE=y" >> arch/arm64/configs/gki_defconfig
-          
-          # Explicitly enable KernelSU Next
           echo "CONFIG_KSU=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_NEXT=y" >> arch/arm64/configs/gki_defconfig
 
