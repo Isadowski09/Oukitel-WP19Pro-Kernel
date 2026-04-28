@@ -18,36 +18,36 @@ jobs:
         run: |
           git clone --depth=1 -b android12-5.10-2024-11_r2 https://android.googlesource.com/kernel/common kernel-source
 
-      - name: Integrate KernelSU Next
+      - name: Integrate KernelSU Next (v3.2.0)
         run: |
           cd kernel-source
           git clone https://github.com/rifsxd/KernelSU-Next ksunext
           
-          # Patch memory directly in the known location
+          # Force memory patch for Android 12 compatibility
           sed -i 's/ksu_flush_icache(start, end);/(void)start; (void)end;/g' ksunext/kernel/patch_memory.c
           
-          # Link to drivers
+          # Link drivers into the main build tree
           ln -sf $(pwd)/ksunext/kernel drivers/kernelsu
           echo "obj-y += kernelsu/" >> drivers/Makefile
           sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
 
-      - name: Configure GZIP + DroidSpace + KSU
+      - name: Force GZIP + KSU Config
         run: |
-          cd kernel-source
-          # Swap LZ4 for GZIP in the config
-          sed -i 's/CONFIG_KERNEL_LZ4=y/# CONFIG_KERNEL_LZ4 is not set/' arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KERNEL_GZIP=y" >> arch/arm64/configs/gki_defconfig
+          cd kernel-source/arch/arm64/configs/
+          # Remove LZ4 and force GZIP
+          sed -i 's/CONFIG_KERNEL_LZ4=y/# CONFIG_KERNEL_LZ4 is not set/g' gki_defconfig
+          echo "CONFIG_KERNEL_GZIP=y" >> gki_defconfig
           
-          # Add DroidSpace and KSU requirements
+          # Add KSU Next and DroidSpace Requirements
           {
+            echo "CONFIG_KSU=y"
+            echo "CONFIG_KSU_NEXT=y"
             echo "CONFIG_NAMESPACES=y"
             echo "CONFIG_OVERLAY_FS=y"
             echo "CONFIG_CGROUP_DEVICE=y"
-            echo "CONFIG_KSU=y"
-            echo "CONFIG_KSU_NEXT=y"
-          } >> arch/arm64/configs/gki_defconfig
+          } >> gki_defconfig
 
-      - name: Build Kernel
+      - name: Build Kernel (GZIP Output)
         run: |
           cd kernel-source
           export ARCH=arm64
@@ -56,7 +56,7 @@ jobs:
           make gki_defconfig
           make -j$(nproc) Image.gz
 
-      - name: Upload Rooted Kernel
+      - name: Upload Rooted GZIP Kernel
         uses: actions/upload-artifact@v4
         with:
           name: rooted-kernel-build
