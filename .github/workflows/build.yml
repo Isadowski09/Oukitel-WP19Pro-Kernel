@@ -18,17 +18,13 @@ jobs:
         run: |
           git clone --depth=1 -b android12-5.10-2024-11_r2 https://android.googlesource.com/kernel/common kernel-source
 
-      - name: Integrate KernelSU Next (Universal Pathing)
+      - name: Integrate KernelSU Next (Final Fix)
         run: |
           cd kernel-source
           git clone https://github.com/rifsxd/KernelSU-Next ksunext
           
-          # This finds the patch file wherever it is in the new repo structure
-          PATCH_FILE=$(find ksunext -name "patch_memory.c")
-          if [ -f "$PATCH_FILE" ]; then
-            sed -i 's/ksu_flush_icache(start, end);/(void)start; (void)end;/g' "$PATCH_FILE"
-            echo "Successfully patched: $PATCH_FILE"
-          fi
+          # Find and delete the problematic cache flush line to bypass the compiler error
+          find ksunext -name "patch_memory.c" -exec sed -i '/ksu_flush_icache/d' {} +
           
           ln -sf $(pwd)/ksunext/kernel drivers/kernelsu
           echo "obj-y += kernelsu/" >> drivers/Makefile
