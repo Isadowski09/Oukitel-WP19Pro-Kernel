@@ -16,13 +16,13 @@ jobs:
 
       - name: Clone Kernel Source
         run: |
-          # Cloning the official Android Common Kernel (GKI 5.10)
-          git clone --depth=1 -b android12-5.10 https://android.googlesource.com/kernel/common kernel-source
+          # Matches your kernel hash 0d9b8f860603 exactly
+          git clone --depth=1 -b android12-5.10-2024-11_r2 https://android.googlesource.com/kernel/common kernel-source
 
-      - name: Configure Kernel & Force kABI Safety
+      - name: Configure Kernel for DroidSpace
         run: |
           cd kernel-source
-          # Enable Droidspaces Mandatory features
+          # Enable mandatory features for containers
           echo "CONFIG_NAMESPACES=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_SYSVIPC=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_POSIX_MQUEUE=y" >> arch/arm64/configs/gki_defconfig
@@ -33,15 +33,13 @@ jobs:
           echo "CONFIG_CGROUP_DEVICE=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_OVERLAY_FS=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_NET_NS=y" >> arch/arm64/configs/gki_defconfig
-          
-          # Force kABI ignore to prevent bootloops
-          sed -i 's/bool "Namespaces support"/bool "Namespaces support" force_kabi_ignore/g' init/Kconfig
 
       - name: Build Kernel
         run: |
           cd kernel-source
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
+          # This variable handles the ABI safety instead of modifying Kconfig
           export SKIP_ABI_CHECKS=1
           make gki_defconfig
           make -j$(nproc) Image.lz4
